@@ -8,22 +8,11 @@
 source("package_loader.R")
 
 NFOLDS = 100
-NSEEDS = 1
+NSEEDS = 10
 INITIAL_SEED = 2
 ACCURACY_PLOT_FILENAME = "brca_accuracies.pdf"
 KAPPA_PLOT_FILENAME = "brca_kappas.pdf"
 ACCURACY_TABLE_FILENAME = "brca_accuracies.tsv"
-
-# args = c('/home/jeff/Repos/tdm2015test2/tdm_auto/normalized_data/', 
-# 		'BRCA_ZEROONE.pcl', 
-# 		'BRCAClin.tsv', 
-# 		'BRCA_TDM_ZEROONE.pcl', 
-# 		'BRCARNASeqClin.tsv', 
-# 		'BRCA_QN_ZEROONE.pcl',
-# 		'BRCARNASeqClin.tsv', 
-# 		'BRCA_LOG_ZEROONE.pcl', 
-# 		'BRCARNASeqClin.tsv', 
-# 		'/home/jeff/Repos/tdm2015test2/tdm_auto/output/')
 
 input_dir = args[1]
 ref_input = args[2]
@@ -98,7 +87,7 @@ preprocessTCGA = function(dataFile, clinFile) {
 # Predict subtypes on TCGA data using previously trained model.
 predictTCGA = function(title, data, model) { 
   # Predict classes based on the trained model.
-  lasso.predict = predict(model, data$data, s = "lambda.min", type="class")
+  lasso.predict = predict(model, data$data, s = "lambda.1se", type="class")
   
   # Make sure all factors are included.
   lasso.predict = factor(lasso.predict, c("Basal", "Her2", "LumA", "LumB", "Normal"))
@@ -123,7 +112,7 @@ trainT = trainT[str_detect(substr(rownames(trainT),1,15), "(\\.01)|(\\.11)"),]
 
 # Load the clinical features.
 clin = read.table(paste0(input_dir, ref_clin), sep='\t', row.names=1, header=T)
-clin[,1] = clin[,3]
+#clin[,1] = clin[,3]
 
 # Remove annotations that have no subtype label.
 clin = subset(clin, clin[,1] != "")
@@ -201,6 +190,14 @@ for(seednum in 1:length(seeds)) {
   lognotshared_accs[[seednum]] = acc
   lognotshareddf = cbind(lognotshareddf,as.vector(acc$byClass[,8]))
 }
+
+# Build a table of accuracies across all datasets.
+accuracies = data.frame(Basal=numeric(0), Her2=numeric(0), LumA=numeric(0), LumB=numeric(0), Normal=numeric(0), LumAB=numeric(0))
+accuracies = rbind(accuracies, apply(tdmdf,1,mean))
+accuracies = rbind(accuracies, apply(qndf,1,mean))
+accuracies = rbind(accuracies, apply(logdf,1,mean))
+rownames(accuracies) <- c("TCGA", "TCGA-RNASeq", "TCGA-RNASeq-LOG", "TCGA-RNASeq-GRT", "TCGA-RNASeq-TDM")
+colnames(accuracies) <- c("Basal", "Her2", "LumA", "LumB", "Normal", "LumAB")
 
 # Aggregate accuracies:
 tdm_tables = lapply(tdm_accs, function(x) x$table)

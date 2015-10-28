@@ -14,17 +14,6 @@ ACCURACY_PLOT_FILENAME = "coadread_accuracies.pdf"
 KAPPA_PLOT_FILENAME = "coadread_kappas.pdf"
 ACCURACY_TABLE_FILENAME = "coadread_accuracies.tsv"
 
-# args = c('/home/jeff/Repos/tdm2015test2/tdm_auto/normalized_data/', 
-# 		'COADREAD_ZEROONE.pcl', 
-# 		'COADREADClin.tsv', 
-# 		'COADREAD_TDM_ZEROONE.pcl', 
-# 		'COADREADRNASeqClin.tsv', 
-# 		'COADREAD_QN_ZEROONE.pcl',
-# 		'COADREADRNASeqClin.tsv', 
-# 		'COADREAD_LOG_ZEROONE.pcl', 
-# 		'COADREADRNASeqClin.tsv', 
-# 		'/home/jeff/Repos/tdm2015test2/tdm_auto/output/')
-
 input_dir = args[1]
 ref_input = args[2]
 ref_clin = args[3]
@@ -117,7 +106,7 @@ preprocessTCGA = function(dataFile, clinFile) {
 # Predict subtypes on TCGA data using previously trained model.
 predictTCGA = function(title, data, model) { 
   # Predict classes based on the trained model.
-  lasso.predict = predict(model, data$data, s = "lambda.min", type = "class")
+  lasso.predict = predict(model, data$data, s = "lambda.1se", type = "class")
   
   # Make sure all factors are included.
   lasso.predict = factor(lasso.predict, c("CIMP", "CIMPL", "NCIMP", "NORMAL"))

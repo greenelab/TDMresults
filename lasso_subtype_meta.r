@@ -13,19 +13,6 @@ ACCURACY_PLOT_FILENAME = "meta_accuracies.pdf"
 KAPPA_PLOT_FILENAME = "meta_kappas.pdf"
 ACCURACY_TABLE_FILENAME = "meta_accuracies.tsv"
 
-# args = c('/home/jeff/Repos/tdm2015test2/tdm_auto/normalized_data/', 
-# 		'METABRICFiltered_ZEROONE.pcl', 
-# 		'combined_subtype.txt', 
-# 		'META_BRCA_MA_ZEROONE.pcl', 
-# 		'BRCAClin.tsv', 
-# 		'META_BRCA_LOG_ZEROONE.pcl', 
-# 		'BRCARNASeqClin.tsv', 
-# 		'META_BRCA_QN_ZEROONE.pcl', 
-# 		'BRCARNASeqClin.tsv', 
-# 		'META_BRCA_TDM_ZEROONE.pcl', 
-# 		'BRCARNASeqClin.tsv', 
-# 		'/home/jeff/Repos/tdm2015test2/tdm_auto/output/')
-
 input_dir = args[1]
 ref_input = args[2]
 ref_clin = args[3]
@@ -106,7 +93,7 @@ preprocessTCGA = function(dataFile, clinFile, RNAseq=TRUE) {
 # Predict subtypes on TCGA data using previously trained model.
 predictTCGA = function(title, data, model) { 
   # Predict classes based on the trained model.
-  lasso.predict = predict(model, data$data, s = "lambda.min", type="class")
+  lasso.predict = predict(model, data$data, s = "lambda.1se", type="class")
   
   # Make sure all factors are included.
   lasso.predict = factor(lasso.predict, c("Basal", "Her2", "LumA", "LumB", "Normal"))

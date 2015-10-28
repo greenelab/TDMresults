@@ -1,2 +1,3 @@
-initial_data = "/home/jeff/Repos/tdm2015test2/tdm_auto/data/"
-normalized_data = "/home/jeff/Repos/tdm2015test2/tdm_auto/normalized_data/"
+# Change somepathto below.
+initial_data = "/somepathto/TDMresults/data/"
+normalized_data = "/somepathto/TDMresults/normalized_data/"
