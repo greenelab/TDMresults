@@ -15,7 +15,7 @@ if (length(args) > 5){
 source("package_loader.R")
 source("tdm.R")
 
-load_it(c("data.table", "gdata", "preprocessCore", "scales"))
+load_it(c("data.table", "gdata", "preprocessCore", "scales", "huge"))
 
 message("Loading reference file...", appendLF=FALSE)
 
@@ -124,6 +124,48 @@ message("Converting NA's to 0's in reference data...", appendLF=FALSE)
 # Convert NA to 0.
 na_to_zero = function(dt, un = 0) gdata::NAToUnknown(dt, un)	
 ref_values = na_to_zero(ref_values)
+
+message("completed.")
+
+message("Performing nonparanormal normalization...", appendLF=FALSE)
+
+pnormal = data.frame(target_values, check.names=FALSE)
+rownames(pnormal) = chartr('.', '-', target_values[[1]])
+colnames(pnormal) = chartr('.', '-', colnames(target_values))
+
+pnormal = pnormal[,-1]
+pnormal = data.matrix(pnormal)
+
+# Get the column names of the target file.
+cols = colnames(target_values[,2:ncol(target_values), with=F])
+
+# Create a nonparanormal normalized dataset.
+pnormal = huge.npn(t(pnormal), npn.func = "shrinkage", npn.thresh = NULL, verbose = TRUE)
+
+write.table(t(pnormal), paste0(output_folder, prefix, "_NPN.pcl"), col.names=TRUE, row.names=TRUE, sep="\t", quote=FALSE)
+
+message("completed.")
+
+message("Performing zero-to-one scaling of nonparanormal normalized data...", appendLF=FALSE)
+
+pnormal = data.frame(t(pnormal))
+rownames(pnormal) = chartr('.', '-', target_values[[1]])
+pnormal = cbind(gene=target_values[[1]], pnormal)
+pnormal = data.table(pnormal)
+
+# Zero to one scale the paranormal normalized data.
+pnormal_zeroone = zero_to_one_transform(pnormal)
+pnormal_zeroone = data.frame(pnormal_zeroone, check.names=FALSE)
+rownames(pnormal_zeroone) = chartr('.', '-', target_values[[1]])
+colnames(pnormal_zeroone) = chartr('.', '-', colnames(target_values))
+
+# Get the column names of the target file.
+cols = colnames(target_values[,2:ncol(target_values), with=F])
+
+# Round all entries.
+for(j in cols) set(pnormal_zeroone, j=j, value=as.numeric(pnormal_zeroone[[j]]))
+
+write.table(pnormal_zeroone, paste0(output_folder, prefix, "_NPN_ZEROONE.pcl"), col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
 
 message("completed.")
 

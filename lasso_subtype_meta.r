@@ -13,6 +13,21 @@ ACCURACY_PLOT_FILENAME = "meta_accuracies.pdf"
 KAPPA_PLOT_FILENAME = "meta_kappas.pdf"
 ACCURACY_TABLE_FILENAME = "meta_accuracies.tsv"
 
+args = c('/home/jeff/Repos/tdm2015test2/tdm_auto/normalized_data/', 
+		'METABRICFiltered_ZEROONE.pcl', 
+		'combined_subtype.txt', 
+		'META_BRCA_MA_ZEROONE.pcl', 
+		'BRCAClin.tsv', 
+		'META_BRCA_LOG_ZEROONE.pcl', 
+		'BRCARNASeqClin.tsv', 
+		'META_BRCA_QN_ZEROONE.pcl', 
+		'BRCARNASeqClin.tsv', 
+		'META_BRCA_TDM_ZEROONE.pcl', 
+		'BRCARNASeqClin.tsv', 
+    'META_BRCA_NPN_ZEROONE.pcl',
+    'BRCARNASeqClin.tsv',
+		'/home/jeff/Repos/tdm2015test2/tdm_auto/output/')
+
 input_dir = args[1]
 ref_input = args[2]
 ref_clin = args[3]
@@ -24,7 +39,9 @@ qn_input = args[8]
 qn_clin = args[9]
 tdm_input = args[10]
 tdm_clin = args[11]
-output_dir = args[12]
+npn_input = args[12]
+npn_clin = args[13]
+output_dir = args[14]
 
 load_it(c("glmnet", "caret", "e1071", "stringr", "plyr"))
 
@@ -41,9 +58,11 @@ tcgadf = setup_acc_df(tcgadf)
 logdf = setup_acc_df(logdf)
 qndf = setup_acc_df(qndf)
 tdmdf = setup_acc_df(tdmdf)
+npndf = setup_acc_df(npndf)
 tdmnotshareddf = setup_acc_df(tdmnotshareddf)
 qnnotshareddf = setup_acc_df(qnnotshareddf)
 lognotshareddf = setup_acc_df(lognotshareddf)
+npnnotshareddf = setup_acc_df(npnnotshareddf)
 
 # Define random seeds.
 set.seed(INITIAL_SEED)
@@ -135,6 +154,7 @@ tcga = preprocessTCGA(tcga_input, tcga_clin, FALSE)
 log = preprocessTCGA(log_input, log_clin)
 qn = preprocessTCGA(qn_input, qn_clin)
 tdm = preprocessTCGA(tdm_input, tdm_clin)
+npn = preprocessTCGA(npn_input, npn_clin)
 
 # Determine which samples are shared between TCGA RNA-seq and TCGA microarray data.
 # Then filter the data to include only those that are shared.
@@ -155,11 +175,16 @@ log_shared = substr(chartr('-', '.', rownames(log$data)),1,15) %in% substr(chart
 log$data = log$data[log_shared,]
 log$response = log$response[log_shared]
 
+npn_shared = substr(chartr('-','.', rownames(npn$data)),1,15) %in% substr(chartr('-','.',rownames(npn$data)),1,15)
+npn$data = npn$data[npn_shared,]
+npn$response = npn$response[npn_shared]
+
 # Pre-allocate vectors to hold results.
 tcga_accs = vector(mode="list", length=length(seeds))
 tdm_accs = vector(mode="list", length=length(seeds))
 qn_accs = vector(mode="list", length=length(seeds))
 log_accs = vector(mode="list", length=length(seeds))
+npn_accs = vector(mode="list", length=length(seeds))
 
 # Perform a number of iterations equal to the number of random seeds.
 # At each iteration, perform n-fold cross validation to build a model on the training data,
@@ -188,31 +213,49 @@ for(seednum in 1:length(seeds)) {
   log_accs[[seednum]] = acc
   logdf <- cbind(logdf,as.vector(acc$byClass[,8]))
 
+  acc = predictTCGA("NPN Results", npn, lasso.model)
+  npn_accs[[seednum]] = acc
+  npndf = cbind(npndf,as.vector(acc$byClass[,8]))
 }
+
+# Build a table of accuracies across all datasets.
+accuracies = data.frame(Basal=numeric(0), Her2=numeric(0), LumA=numeric(0), LumB=numeric(0), Normal=numeric(0))
+accuracies = rbind(accuracies, apply(tcgadf, 1, mean))
+accuracies = rbind(accuracies, apply(tdmdf,1,mean))
+accuracies = rbind(accuracies, apply(qndf,1,mean))
+accuracies = rbind(accuracies, apply(logdf,1,mean))
+accuracies = rbind(accuracies, apply(npndf,1,mean))
+rownames(accuracies) <- c("MA", "TDM", "QN", "LOG", "NPN")
+colnames(accuracies) <- c("Basal", "Her2", "LumA", "LumB", "Normal")
+
 
 # Aggregate accuracies:
 tdm_tables = lapply(tdm_accs, function(x) x$table)
 qn_tables = lapply(qn_accs, function(x) x$table)
 log_tables = lapply(log_accs, function(x) x$table)
 tcga_tables = lapply(tcga_accs, function(x) x$table)
+npn_tables = lapply(npn_accs, function(x) x$table)
 
 tdm_reduced = Reduce("+", tdm_tables) / length(tdm_tables)
 qn_reduced = Reduce("+", qn_tables) / length(qn_tables)
 log_reduced = Reduce("+", log_tables) / length(log_tables)
 tcga_reduced = Reduce("+", tcga_tables) / length(tcga_tables)
+npn_reduced = Reduce("+", npn_tables) / length(npn_tables)
 
 tdm_reduced[1:5,1:5] = t(apply(tdm_reduced, 1, function(x) as.integer(round(x))))[1:5,1:5]
 qn_reduced[1:5,1:5] = t(apply(qn_reduced, 1, function(x) as.integer(round(x))))[1:5,1:5]
 log_reduced[1:5,1:5] = t(apply(log_reduced, 1, function(x) as.integer(round(x))))[1:5,1:5]
 tcga_reduced[1:5,1:5] = t(apply(tcga_reduced, 1, function(x) as.integer(round(x))))[1:5,1:5]
+npn_reduced[1:5,1:5] = t(apply(npn_reduced, 1, function(x) as.integer(round(x))))[1:5,1:5]
 
 tdm_cm = confusionMatrix(tdm_reduced)
 qn_cm = confusionMatrix(qn_reduced)
 log_cm = confusionMatrix(log_reduced)
 tcga_cm = confusionMatrix(tcga_reduced)
+npn_cm = confusionMatrix(npn_reduced)
 
-all_accs = data.frame(rbind(log_cm$overall, qn_cm$overall, tdm_cm$overall, tcga_cm$overall))
-all_accs = cbind(all_accs, method=c("LOG", "QN", "TDM", "MA"))
+all_accs = data.frame(rbind(log_cm$overall, qn_cm$overall, tdm_cm$overall, tcga_cm$overall, npn_cm$overall))
+all_accs = cbind(all_accs, method=c("LOG", "QN", "TDM", "MA", "NPN"))
 
 nir = all_accs[1,]$AccuracyNull
 

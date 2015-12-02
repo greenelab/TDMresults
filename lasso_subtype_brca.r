@@ -14,6 +14,19 @@ ACCURACY_PLOT_FILENAME = "brca_accuracies.pdf"
 KAPPA_PLOT_FILENAME = "brca_kappas.pdf"
 ACCURACY_TABLE_FILENAME = "brca_accuracies.tsv"
 
+args = c('/home/jeff/Repos/tdm2015test2/tdm_auto/normalized_data/', 
+		'BRCA_ZEROONE.pcl', 
+		'BRCARNASeqClin.tsv', 
+		'BRCA_TDM_ZEROONE.pcl', 
+		'BRCARNASeqClin.tsv', 
+		'BRCA_QN_ZEROONE.pcl',
+		'BRCARNASeqClin.tsv', 
+		'BRCA_LOG_ZEROONE.pcl', 
+		'BRCARNASeqClin.tsv', 
+    'BRCA_NPN_ZEROONE.pcl',
+		'BRCARNASeqClin.tsv',
+    '/home/jeff/Repos/tdm2015test2/tdm_auto/output/')
+
 input_dir = args[1]
 ref_input = args[2]
 ref_clin = args[3]
@@ -23,7 +36,9 @@ qn_input = args[6]
 qn_clin = args[7]
 log_input = args[8]
 log_clin = args[9]
-output_dir = args[10]
+pnormal_input = args[10]
+pnormal_clin = args[11]
+output_dir = args[12]
 
 load_it(c("glmnet", "caret", "e1071", "stringr", "plyr"))
 
@@ -39,13 +54,16 @@ refdf = setup_acc_df(refdf)
 tdmdf = setup_acc_df(tdmdf)
 qndf = setup_acc_df(qndf)
 logdf = setup_acc_df(logdf)
+pnormaldf = setup_acc_df(pnormaldf)
 tdmnotshareddf = setup_acc_df(tdmnotshareddf)
 qnnotshareddf = setup_acc_df(qnnotshareddf)
 lognotshareddf = setup_acc_df(lognotshareddf)
+pnormalnotshareddf = setup_acc_df(pnormalnotshareddf)
 
 # Define random seeds.
 set.seed(INITIAL_SEED)
 seeds = sample(1:10000, NSEEDS)
+#seeds = c(7024)
 
 message(paste("Random seeds:", paste(seeds, collapse=", ")), appendLF=TRUE)
 
@@ -132,15 +150,18 @@ trainT = trainT[!is.na(clin[,1][match(substr(chartr('-', '.', rownames(trainT)),
 tdm = preprocessTCGA(tdm_input, tdm_clin)
 qn = preprocessTCGA(qn_input, qn_clin)
 log = preprocessTCGA(log_input, log_clin)
+pnormal = preprocessTCGA(pnormal_input, pnormal_clin)
 
 # Determine which samples are shared between training and test data.
 tdm_shared = substr(chartr('-', '.', rownames(tdm$data)),1,15) %in% substr(chartr('-', '.', rownames(trainT)),1,15)  
 qn_shared = substr(chartr('-', '.', rownames(qn$data)),1,15) %in% substr(chartr('-', '.', rownames(trainT)),1,15)
 log_shared = substr(chartr('-', '.', rownames(log$data)),1,15) %in% substr(chartr('-', '.', rownames(trainT)),1,15)
+pnormal_shared = substr(chartr('-', '.', rownames(pnormal$data)),1,15) %in% substr(chartr('-', '.', rownames(trainT)),1,15)
 
 tdm_notshared = tdm
 qn_notshared = qn
 log_notshared = log
+pnormal_notshared = pnormal
 
 # Create datasets for samples that are not shared between training and test.
 tdm_notshared$data = tdm_notshared$data[!tdm_shared,]
@@ -149,14 +170,18 @@ qn_notshared$data = qn_notshared$data[!qn_shared,]
 qn_notshared$response = qn_notshared$response[!qn_shared]
 log_notshared$data = log_notshared$data[!log_shared,]
 log_notshared$response = log_notshared$response[!log_shared]
+pnormal_notshared$data = pnormal_notshared$data[!pnormal_shared,]
+pnormal_notshared$response = pnormal_notshared$response[!pnormal_shared]
 
 # Pre-allocate vectors to hold results.
 tdm_accs = vector(mode="list", length=length(seeds))
 qn_accs = vector(mode="list", length=length(seeds))
 log_accs = vector(mode="list", length=length(seeds))
+pnormal_accs = vector(mode="list", length=length(seeds))
 tdmnotshared_accs = vector(mode="list", length=length(seeds))
 qnnotshared_accs = vector(mode="list", length=length(seeds))
 lognotshared_accs = vector(mode="list", length=length(seeds))
+pnormalnotshared_accs = vector(mode="list", length=length(seeds))
 
 # Perform a number of iterations equal to the number of random seeds.
 # At each iteration, perform n-fold cross validation to build a model on the training data,
@@ -178,6 +203,10 @@ for(seednum in 1:length(seeds)) {
   log_accs[[seednum]] = acc
   logdf = cbind(logdf,as.vector(acc$byClass[,8]))
 
+  acc = predictTCGA("PNORMAL Results", pnormal, lasso.model)
+  pnormal_accs[[seednum]] = acc
+  pnormaldf = cbind(pnormaldf, as.vector(acc$byClass[,8]))
+
   acc = predictTCGA("TDM (not shared) Results", tdm_notshared, lasso.model)
   tdmnotshared_accs[[seednum]] = acc
   tdmnotshareddf = cbind(tdmnotshareddf,as.vector(acc$byClass[,8]))
@@ -189,35 +218,44 @@ for(seednum in 1:length(seeds)) {
   acc = predictTCGA("LOG(not shared) Results", log_notshared, lasso.model)
   lognotshared_accs[[seednum]] = acc
   lognotshareddf = cbind(lognotshareddf,as.vector(acc$byClass[,8]))
+
+  acc = predictTCGA("PNORMAL (not shared) Results", pnormal_notshared, lasso.model)
+  pnormalnotshared_accs[[seednum]] = acc
+  pnormalnotshareddf = cbind(pnormalnotshareddf, as.vector(acc$byClass[,8]))
 }
 
 # Build a table of accuracies across all datasets.
-accuracies = data.frame(Basal=numeric(0), Her2=numeric(0), LumA=numeric(0), LumB=numeric(0), Normal=numeric(0), LumAB=numeric(0))
+accuracies = data.frame(Basal=numeric(0), Her2=numeric(0), LumA=numeric(0), LumB=numeric(0), Normal=numeric(0))
 accuracies = rbind(accuracies, apply(tdmdf,1,mean))
 accuracies = rbind(accuracies, apply(qndf,1,mean))
 accuracies = rbind(accuracies, apply(logdf,1,mean))
-rownames(accuracies) <- c("TCGA", "TCGA-RNASeq", "TCGA-RNASeq-LOG", "TCGA-RNASeq-GRT", "TCGA-RNASeq-TDM")
-colnames(accuracies) <- c("Basal", "Her2", "LumA", "LumB", "Normal", "LumAB")
+accuracies = rbind(accuracies, apply(pnormaldf,1,mean))
+rownames(accuracies) = c("TDM", "QN", "LOG", "PARANORMAL")
+colnames(accuracies) = c("Basal", "Her2", "LumA", "LumB", "Normal")
 
 # Aggregate accuracies:
 tdm_tables = lapply(tdm_accs, function(x) x$table)
 qn_tables = lapply(qn_accs, function(x) x$table)
 log_tables = lapply(log_accs, function(x) x$table)
+paranormal_tables = lapply(pnormal_accs, function(x) x$table)
 
 tdm_reduced = Reduce("+", tdm_tables) / length(tdm_tables)
 qn_reduced = Reduce("+", qn_tables) / length(qn_tables)
 log_reduced = Reduce("+", log_tables) / length(log_tables)
+paranormal_reduced = Reduce("+", paranormal_tables) / length(paranormal_tables)
 
 tdm_reduced[1:5,1:5] = t(apply(tdm_reduced, 1, function(x) as.integer(round(x))))[1:5,1:5]
 qn_reduced[1:5,1:5] = t(apply(qn_reduced, 1, function(x) as.integer(round(x))))[1:5,1:5]
 log_reduced[1:5,1:5] = t(apply(log_reduced, 1, function(x) as.integer(round(x))))[1:5,1:5]
+paranormal_reduced[1:5,1:5] = t(apply(paranormal_reduced, 1, function(x) as.integer(round(x))))[1:5,1:5]
 
 tdm_cm = confusionMatrix(tdm_reduced)
 qn_cm = confusionMatrix(qn_reduced)
 log_cm = confusionMatrix(log_reduced)
+paranormal_cm = confusionMatrix(paranormal_reduced)
 
-all_accs = data.frame(rbind(tdm_cm$overall, qn_cm$overall, log_cm$overall))
-all_accs = cbind(all_accs, method=c("TDM", "QN", "LOG"))
+all_accs = data.frame(rbind(tdm_cm$overall, qn_cm$overall, log_cm$overall, paranormal_cm$overall))
+all_accs = cbind(all_accs, method=c("TDM", "QN", "LOG", "PARANORMAL"))
 
 nir = all_accs[1,]$AccuracyNull
 
@@ -226,7 +264,7 @@ ci = aes(ymin=AccuracyLower, ymax=AccuracyUpper)
 cbPalette = c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 ggplot(all_accs, aes(x=factor(method), y=Accuracy, color=method)) +
 geom_point(size=3) +
-geom_errorbar(ci, width=.2) +
+geom_errorbar(ci, width=.3) +
 ylab("Total Accuracy") +
 xlab("Normalization") +
 theme_bw() +

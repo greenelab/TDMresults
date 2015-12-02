@@ -14,6 +14,19 @@ ACCURACY_PLOT_FILENAME = "coadread_accuracies.pdf"
 KAPPA_PLOT_FILENAME = "coadread_kappas.pdf"
 ACCURACY_TABLE_FILENAME = "coadread_accuracies.tsv"
 
+args = c('/home/jeff/Repos/tdm2015test2/tdm_auto/normalized_data/', 
+		'COADREAD_ZEROONE.pcl', 
+		'COADREADClin.tsv', 
+		'COADREAD_TDM_ZEROONE.pcl', 
+		'COADREADRNASeqClin.tsv', 
+		'COADREAD_QN_ZEROONE.pcl',
+		'COADREADRNASeqClin.tsv', 
+		'COADREAD_LOG_ZEROONE.pcl', 
+		'COADREADRNASeqClin.tsv', 
+    'COADREAD_NPN_ZEROONE.pcl',
+    'COADREADRNASeqClin.tsv',
+		'/home/jeff/Repos/tdm2015test2/tdm_auto/output/')
+
 input_dir = args[1]
 ref_input = args[2]
 ref_clin = args[3]
@@ -23,7 +36,9 @@ qn_input = args[6]
 qn_clin = args[7]
 log_input = args[8]
 log_clin = args[9]
-output_dir = args[10]
+npn_input = args[10]
+npn_clin = args[11]
+output_dir = args[12]
 
 load_it(c("glmnet", "caret", "e1071", "stringr", "plyr"))
 
@@ -39,9 +54,11 @@ refdf = setup_acc_df(refdf)
 tdmdf = setup_acc_df(tdmdf)
 qndf = setup_acc_df(qndf)
 logdf = setup_acc_df(logdf)
+npndf = setup_acc_df(npndf)
 tdmnotshareddf = setup_acc_df(tdmnotshareddf)
 qnnotshareddf = setup_acc_df(qnnotshareddf)
-lognotsharedf = setup_acc_df(lognotshareddf)
+lognotshareddf = setup_acc_df(lognotshareddf)
+npnnotshareddf = setup_acc_df(npnnotshareddf)
 
 # Define random seeds.
 set.seed(INITIAL_SEED)
@@ -170,11 +187,14 @@ trainT = trainT[!is.na(clin[,2][match(substr(chartr('-', '.', rownames(trainT)),
 tdm = preprocessTCGA(tdm_input, tdm_clin)
 qn = preprocessTCGA(qn_input, qn_clin)
 log = preprocessTCGA(log_input, log_clin)
+npn = preprocessTCGA(npn_input, npn_clin)
 
 # Determine which samples are shared between training and test data.
 tdm_shared = substr(chartr('-', '.', rownames(tdm$data)),1,15) %in% substr(chartr('-', '.', rownames(trainT)),1,15)  
 qn_shared = substr(chartr('-', '.', rownames(qn$data)),1,15) %in% substr(chartr('-', '.', rownames(trainT)),1,15)
 log_shared = substr(chartr('-', '.', rownames(log$data)),1,15) %in% substr(chartr('-', '.', rownames(trainT)),1,15)
+npn_shared = substr(chartr('-', '.', rownames(npn$data)),1,15) %in% substr(chartr('-', '.', rownames(trainT)),1,15)
+
 
 # Filter data to include only those samples not shared between training and test.
 tdm$data = tdm$data[!tdm_shared,]
@@ -183,12 +203,14 @@ qn$data = qn$data[!qn_shared,]
 qn$response = qn$response[!qn_shared]
 log$data = log$data[!log_shared,]
 log$response = log$response[!log_shared]
+npn$data = npn$data[!npn_shared,]
+npn$response = npn$response[!npn_shared]
 
 # Pre-allocate vectors for classification results
 tdm_accs = vector(mode="list", length=length(seeds))
 qn_accs = vector(mode="list", length=length(seeds))
 log_accs = vector(mode="list", length=length(seeds))
-
+npn_accs = vector(mode="list", length=length(seeds))
 
 # Perform a number of iterations equal to the number of random seeds.
 # At each iteration, perform n-fold cross validation to build a model on the training data,
@@ -210,15 +232,20 @@ for(seednum in 1:length(seeds)) {
   acc = predictTCGA("LOG Results", log, lasso.model)
   log_accs[[seednum]] = acc
   logdf = cbind(logdf,as.vector(acc$byClass[,8]))
+
+  acc = predictTCGA("NPN Results", npn, lasso.model)
+  npn_accs[[seednum]] = acc
+  npndf = cbind(npndf, as.vector(acc$byClass[,8]))
 }
 
-# # Build a table of accuracies across all datasets.
-# accuracies = data.frame(NCIMP=numeric(0), CIMPL=numeric(0), CIMP=numeric(0), NORMAL=numeric(0))
-# accuracies = rbind(accuracies, apply(tdmdf,1,function(x) mean(x)))
-# accuracies = rbind(accuracies, apply(qndf,1,function(x) mean(x)))
-# accuracies = rbind(accuracies, apply(logdf,1,function(x) mean(x)))
-# rownames(accuracies) = c("TDM", "QN", "LOG")
-# colnames(accuracies) = c("CIMP", "CIMPL", "NCIMP", "NORMAL")
+# Build a table of accuracies across all datasets.
+accuracies = data.frame(NCIMP=numeric(0), CIMPL=numeric(0), CIMP=numeric(0), NORMAL=numeric(0))
+accuracies = rbind(accuracies, apply(tdmdf,1,function(x) mean(x)))
+accuracies = rbind(accuracies, apply(qndf,1,function(x) mean(x)))
+accuracies = rbind(accuracies, apply(logdf,1,function(x) mean(x)))
+accuracies = rbind(accuracies, apply(npndf,1,function(x) mean(x)))
+rownames(accuracies) = c("TDM", "QN", "LOG", "NPN")
+colnames(accuracies) = c("CIMP", "CIMPL", "NCIMP", "NORMAL")
 
 # write.table(accuracies, file=paste0(output_dir,"/COADlassoSubtypeAccuracies.txt"), sep='\t', row.names=T, col.names=T)
 
@@ -226,21 +253,26 @@ for(seednum in 1:length(seeds)) {
 tdm_tables = lapply(tdm_accs, function(x) x$table)
 qn_tables = lapply(qn_accs, function(x) x$table)
 log_tables = lapply(log_accs, function(x) x$table)
+npn_tables = lapply(npn_accs, function(x) x$table)
 
 tdm_reduced = Reduce("+", tdm_tables) / length(tdm_tables)
 qn_reduced = Reduce("+", qn_tables) / length(qn_tables)
 log_reduced = Reduce("+", log_tables) / length(log_tables)
+npn_reduced = Reduce("+", npn_tables) / length(npn_tables)
 
 tdm_reduced[1:4,1:4] = t(apply(tdm_reduced, 1, function(x) as.integer(round(x))))[1:4,1:4]
 qn_reduced[1:4,1:4] = t(apply(qn_reduced, 1, function(x) as.integer(round(x))))[1:4,1:4]
 log_reduced[1:4,1:4] = t(apply(log_reduced, 1, function(x) as.integer(round(x))))[1:4,1:4]
+npn_reduced[1:4,1:4] = t(apply(npn_reduced, 1, function(x) as.integer(round(x))))[1:4,1:4]
 
 tdm_cm = confusionMatrix(tdm_reduced)
 qn_cm = confusionMatrix(qn_reduced)
 log_cm = confusionMatrix(log_reduced)
+npn_cm = confusionMatrix(npn_reduced)
 
-all_accs = data.frame(rbind(tdm_cm$overall, qn_cm$overall, log_cm$overall))
-all_accs = cbind(all_accs, method=c("TDM", "QN", "LOG"))
+all_accs = data.frame(rbind(tdm_cm$overall, qn_cm$overall, log_cm$overall, npn_cm$overall))
+
+all_accs = cbind(all_accs, method=c("TDM", "QN", "LOG", "NPN"))
 
 nir = all_accs[1,]$AccuracyNull
 
