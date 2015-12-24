@@ -6,8 +6,8 @@ data_folder = args[3]
 output_folder = args[4]
 prefix = args[5]
 
-if (length(args) > 5){
-	tcga_file = args[6]
+if (length(args) > 6){
+	tcga_file = args[7]
 } else {
 	tcga_file = NULL
 }
@@ -15,7 +15,7 @@ if (length(args) > 5){
 source("package_loader.R")
 source("tdm.R")
 
-load_it(c("data.table", "gdata", "preprocessCore", "scales", "huge"))
+load_it(c("data.table", "gdata", "preprocessCore", "scales", "huge", "limma"))
 
 message("Loading reference file...", appendLF=FALSE)
 
@@ -129,43 +129,43 @@ message("completed.")
 
 message("Performing nonparanormal normalization...", appendLF=FALSE)
 
-pnormal = data.frame(target_values, check.names=FALSE)
-rownames(pnormal) = chartr('.', '-', target_values[[1]])
-colnames(pnormal) = chartr('.', '-', colnames(target_values))
+npn = data.frame(target_values, check.names=FALSE)
+rownames(npn) = chartr('.', '-', target_values[[1]])
+colnames(npn) = chartr('.', '-', colnames(target_values))
 
-pnormal = pnormal[,-1]
-pnormal = data.matrix(pnormal)
+npn = npn[,-1]
+npn = data.matrix(npn)
 
 # Get the column names of the target file.
 cols = colnames(target_values[,2:ncol(target_values), with=F])
 
 # Create a nonparanormal normalized dataset.
-pnormal = huge.npn(t(pnormal), npn.func = "shrinkage", npn.thresh = NULL, verbose = TRUE)
+npn = huge.npn(t(npn), npn.func = "shrinkage", npn.thresh = NULL, verbose = TRUE)
 
-write.table(t(pnormal), paste0(output_folder, prefix, "_NPN.pcl"), col.names=TRUE, row.names=TRUE, sep="\t", quote=FALSE)
+write.table(t(npn), paste0(output_folder, prefix, "_NPN.pcl"), col.names=TRUE, row.names=TRUE, sep="\t", quote=FALSE)
 
 message("completed.")
 
 message("Performing zero-to-one scaling of nonparanormal normalized data...", appendLF=FALSE)
 
-pnormal = data.frame(t(pnormal))
-rownames(pnormal) = chartr('.', '-', target_values[[1]])
-pnormal = cbind(gene=target_values[[1]], pnormal)
-pnormal = data.table(pnormal)
+npn = data.frame(t(npn))
+rownames(npn) = chartr('.', '-', target_values[[1]])
+npn = cbind(gene=target_values[[1]], npn)
+npn = data.table(npn)
 
 # Zero to one scale the paranormal normalized data.
-pnormal_zeroone = zero_to_one_transform(pnormal)
-pnormal_zeroone = data.frame(pnormal_zeroone, check.names=FALSE)
-rownames(pnormal_zeroone) = chartr('.', '-', target_values[[1]])
-colnames(pnormal_zeroone) = chartr('.', '-', colnames(target_values))
+npn_zeroone = zero_to_one_transform(npn)
+npn_zeroone = data.frame(npn_zeroone, check.names=FALSE)
+rownames(npn_zeroone) = chartr('.', '-', target_values[[1]])
+colnames(npn_zeroone) = chartr('.', '-', colnames(target_values))
 
 # Get the column names of the target file.
 cols = colnames(target_values[,2:ncol(target_values), with=F])
 
 # Round all entries.
-for(j in cols) set(pnormal_zeroone, j=j, value=as.numeric(pnormal_zeroone[[j]]))
+for(j in cols) set(npn_zeroone, j=j, value=as.numeric(npn_zeroone[[j]]))
 
-write.table(pnormal_zeroone, paste0(output_folder, prefix, "_NPN_ZEROONE.pcl"), col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+write.table(npn_zeroone, paste0(output_folder, prefix, "_NPN_ZEROONE.pcl"), col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
 
 message("completed.")
 
@@ -355,6 +355,23 @@ if(!is.null(tcga_file)) {
 	message("completed.")
 }
 
+message("Performing zero-to-one scaling of untransformed data...", appendLF=FALSE)
+# Zero to one transform reference data.
+target_zeroone = zero_to_one_transform(target_values)
+target_zeroone = data.frame(target_zeroone, check.names=FALSE)
+rownames(target_zeroone) = chartr('.', '-', target_values[[1]])
+colnames(target_zeroone) = chartr('.', '-', colnames(target_values))
+
+# Get the column names of the target file.
+cols = colnames(target_values[,2:ncol(target_values), with=F])
+
+# Round all entries.
+for(j in cols) set(target_zeroone, j=j, value=as.numeric(target_zeroone[[j]]))
+
+write.table(target_zeroone, paste0(output_folder, prefix, "_UN_ZEROONE.pcl"), col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
+
+message("completed.")
+
 message("Performing zero-to-one scaling of reference data...", appendLF=FALSE)
 
 # Zero to one transform reference data.
@@ -369,9 +386,38 @@ cols = colnames(ref_values[,2:ncol(ref_values), with=F])
 # Round all entries.
 for(j in cols) set(ref_zeroone, j=j, value=as.numeric(ref_zeroone[[j]]))
 
-
 write.table(ref_zeroone, paste0(output_folder, prefix, "_ZEROONE.pcl"), col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
 
 message("completed.")
+
+ref_npn = data.frame(ref_values, check.names=FALSE)
+rownames(ref_npn) = chartr('.', '-', ref_values[[1]])
+colnames(ref_npn) = chartr('.', '-', colnames(ref_values))
+
+ref_npn = ref_npn[,-1]
+ref_npn = data.matrix(ref_npn)
+
+ref_npn = huge.npn(t(ref_npn))
+
+write.table(t(ref_npn), paste0(output_folder, prefix, "_REF_NPN.pcl"), col.names=TRUE, row.names=TRUE, sep="\t", quote=FALSE)
+
+ref_npn = data.frame(t(ref_npn))
+rownames(ref_npn) = chartr('.', '-', ref_values[[1]])
+ref_npn = cbind(gene=ref_values[[1]], ref_npn)
+ref_npn = data.table(ref_npn)
+
+# Zero to one scale the paranormal normalized data.
+ref_npn_zeroone = zero_to_one_transform(ref_npn)
+ref_npn_zeroone = data.frame(ref_npn_zeroone, check.names=FALSE)
+rownames(ref_npn_zeroone) = chartr('.', '-', ref_values[[1]])
+colnames(ref_npn_zeroone) = chartr('.', '-', colnames(ref_values))
+
+# Get the column names of the target file.
+cols = colnames(ref_values[,2:ncol(ref_values), with=F])
+
+# Round all entries.
+for(j in cols) set(ref_npn_zeroone, j=j, value=as.numeric(ref_npn_zeroone[[j]]))
+
+write.table(ref_npn_zeroone, paste0(output_folder, prefix, "_REF_NPN_ZEROONE.pcl"), col.names=TRUE, row.names=FALSE, sep="\t", quote=FALSE)
 
 message("Normalization complete.")
