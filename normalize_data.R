@@ -6,8 +6,8 @@ data_folder = args[3]
 output_folder = args[4]
 prefix = args[5]
 
-if (length(args) > 6){
-	tcga_file = args[7]
+if (length(args) > 5){
+	tcga_file = args[6]
 } else {
 	tcga_file = NULL
 }

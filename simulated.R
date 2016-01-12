@@ -519,3 +519,33 @@ ggplot(data=correlation, aes(x=Noise, y=Tau, color=Dataset, group=Dataset, shape
 ggsave(paste0(output, "correlations.pdf"), plot=last_plot(), width=6, height=3)
 
 quantro(t(test_results$last_log), test_results$labels[[20]], B=100)
+
+plot_mds = function(data) {
+	the_plot = ggplot() + 
+		geom_point(data=data,aes(x=MDS1,y=MDS2,shape=labels,colour=labels),size=2) + 
+		theme_bw() + 
+		theme(axis.text.x = element_text(size=8, angle = 90, hjust = 1),  
+				axis.text.y = element_text(size=8, angle = 90, hjust = 1), 
+				axis.title.x = element_text(size=10), 
+				axis.title.y = element_text(size=10), 
+				panel.background = element_blank(), 
+				panel.grid.major = element_blank(),  
+				panel.grid.minor = element_blank(),  
+				plot.background = element_blank(),
+				plot.title = element_text(size=12)) +
+		labs(x="Coordinate 1", y="Coordinate 2") +
+		theme(legend.direction = "horizontal", 
+				legend.position = "bottom", 
+				legend.box="vertical") +
+		scale_color_manual(values=cbbPalette) 
+		return(the_plot)
+}
+
+tdm_plot = plot_mds(mds_tdm)
+log_plot = plot_mds(mds_log)
+qn_plot = plot_mds(mds_qn)
+npn_plot = plot_mds(mds_npn)
+
+output = plot_grid(tdm_plot, log_plot, qn_plot, npn_plot, ncol = 4,
+          align = "h", labels = c("A", "B", "C", "D"), label_size = 15)
+save_plot("mds_plots.pdf", output, ncol = 4, base_width=2.5, base_height=3)
