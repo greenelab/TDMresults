@@ -14,32 +14,33 @@ clone to retrieve the datasets. After retrieving the datasets, using
 run_experiments.R will regenerate the results.
 
 This requires the following R & Bioconductor packages be installed:
-    * ggplot2
-		* reshape2
-		* Hmisc
-		* data.table
-		* scales
-		* sdcMicro
-		* flexclust
-		* fpc
-		* corrplot
-		* ape
-		* cluster
-		* plyr
-		* dplyr
-		* devtools
-		* quantro
-		* preprocessCore
-		* gridExtra
-		* huge
-		* caret
-		* limma
-    * glmnet
-    * e1071
-    * stringr
-    * gdata
-    * binr
-    * cowplot
+
+	* ggplot2
+	* reshape2
+	* Hmisc
+	* data.table
+	* scales
+	* sdcMicro
+	* flexclust
+	* fpc
+	* corrplot
+	* ape
+	* cluster
+	* plyr
+	* dplyr
+	* devtools
+	* quantro
+	* preprocessCore
+	* gridExtra
+	* huge
+	* caret
+	* limma
+	* glmnet
+	* e1071
+	* stringr
+	* gdata
+	* binr
+   	* cowplot
 
 One github package is required:
 
