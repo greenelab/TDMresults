@@ -3,18 +3,18 @@ source('package_loader.R')
 source('directories.R')
 
 run_clustering = function(
-		num_trials = 20, 
-		num_methods = 4, 
-		noise_loop = TRUE, 
-		noise = 0, 
-		zero_data = FALSE, 
-		noise_step = .5, 
-		ref_file="ref_file.txt", 
-		target_file="target_file.txt", 
+		num_trials = 20,
+		num_methods = 4,
+		noise_loop = TRUE,
+		noise = 0,
+		zero_data = FALSE,
+		noise_step = .5,
+		ref_file="ref_file.txt",
+		target_file="target_file.txt",
 		nsamples = 400,
 		nconditions = 4,
 		seed=7532) {
-	
+
 	set.seed(seed)
 
 	# Set up a matrix to store the results in.
@@ -35,12 +35,12 @@ run_clustering = function(
 	# Read in the reference file.
 	ref = fread(ref_file, header=T, sep="\t")
 
-	# The reference file will be changed each time through the loop, so keep 
+	# The reference file will be changed each time through the loop, so keep
 	# the original as well.
 	orig_ref = ref
 
 	ref_t = t(ref)
-	
+
 	# Rescale the data so that it goes from 4 to 14. The simulator
 	# produces values from [0,1].
 	orig_ref_scaled = data.frame(
@@ -50,12 +50,12 @@ run_clustering = function(
 	# Read in the target file to a data.table. This is the file we want
 	# to normalize.
 	targ = fread(target_file, header=F, sep="\t")
-	
-	orig_targ = targ	
-	
+
+	orig_targ = targ
+
 	# Transpose the file so that genes are rows.
 	targ_t = t(targ)
-	
+
 	# Rescale the data so that they go from [4,14].
 	orig_targ_scaled = data.frame(matrix(scales::rescale(
 					as.numeric(as.vector(
@@ -63,7 +63,7 @@ run_clustering = function(
 							targ_t[,2:ncol(targ_t)]))), to=c(4,14)), ncol=nsamples))
 
 	# Now perform num_trials trials, possibly adding noise for each.
-	for(i in 0:(num_trials-1)) {	
+	for(i in 0:(num_trials-1)) {
 		# Get a permutation of the columns from the reference data.
 		# They come from the simulator grouped together by condition,
 		# so we want to break that up.
@@ -83,43 +83,43 @@ run_clustering = function(
 
 		# Divide the labels into nconditions groups.
 		ref_labels = factor(as.numeric(cut(ref_labels, nconditions)))
-		
+
 		# Create a vector of labels for the data. The first label
 		# to be encountered is 1, and so forth.
 		ref_labels = as.numeric(factor(ref_labels,levels=unique(ref_labels)))
-		
+
 		# Now permute the reference data.
 		cols = orig_cols
 		ref_scaled = ref_scaled[,cols]
-		
+
 		# Name the samples in the reference data.
 		colnames(ref_scaled) = paste0("JIHGFEDCBA", 1:ncol(ref_scaled))
-		
+
 		# The file with the reference data has samples represented as rows,
 		# and genes as columns, so this creates a column with gene names.
 		ref_values = data.table(cbind(colnames(ref), ref_scaled))
-		
+
 		# Set the name of the column with the genes.
 		setnames(ref_values, colnames(ref_values)[1], "gene")
 
-		# Permute the target file. We do this in the same order as 
+		# Permute the target file. We do this in the same order as
 		# the reference file so that we can keep track of which samples
-		# are which. 
+		# are which.
 		targ_scaled = targ_scaled[,cols]
 		targ_scaled = data.table(targ_scaled)
-		
+
 		# Add a column with the gene names.
 		targ_scaled = cbind(as.character(targ[1,]), targ_scaled)
-		
+
 		# Inverse log transform the data
 		targ_scaled = inv_log_transform(targ_scaled)
-		
+
 		# Rescale the data again, this time to an increased dynamic range
 		# to simulate RNA-seq (the range, not so much the distribution).
-		# Combined with additional noise, we'll get some of the kind of 
+		# Combined with additional noise, we'll get some of the kind of
 		# changes we see in real RNA-seq data.
 		targ_scaled = round(data.frame(matrix(scales::rescale(
-							as.numeric(as.vector(data.matrix(targ_scaled[,2:ncol(targ_scaled),with=F]))), 
+							as.numeric(as.vector(data.matrix(targ_scaled[,2:ncol(targ_scaled),with=F]))),
 							to=c(0,1000000)), ncol=nsamples)))
 		targ_orig = data.table(targ_scaled)
 		# Add noise to the target data. If NOISE_LOOP, then
@@ -134,16 +134,16 @@ run_clustering = function(
 			targ_scaled = targ_scaled + abs(min(targ_scaled))
 		}
 		ref_values = data.table(cbind(colnames(ref), ref_scaled))
-		
+
 		# Set the name of the column with the genes.
 		setnames(ref_values, colnames(ref_values)[1], "gene")
-		
+
 		# If ZERO_DATA, then zero out a number of genes proprotional
 		# to the trial.
 		if(zero_data) {
 			targ_scaled[sample(nrow(targ_scaled), i/100*nrow(targ_scaled)),]=0
 		}
-		
+
 		# Now add the gene names to the target data.
 		targ_scaled = cbind(as.character(targ[1,]),targ_scaled)
 		colnames(targ_scaled)[2:ncol(targ_scaled)] = paste0("ABCDEFGHIJ", 1:(ncol(targ_scaled)-1))
@@ -153,58 +153,58 @@ run_clustering = function(
 		# Perform TDM transformation on the RNA-seq data.
 		tdm_dt = tdm_transform(
 			target_data=targ_scaled,
-			ref_data=ref_values, 
-			negative=TRUE, 
-			filter_p=FALSE, 
-			inv_reference=FALSE, 
+			ref_data=ref_values,
+			negative=TRUE,
+			filter_p=FALSE,
+			inv_reference=FALSE,
 			log_target=FALSE)
-		
+
 		# Filter the target data to include only those genes, and in
 		# that order, found in the reference distribution.
 		tdm_dt = tdm_dt[gene %in% ref_values$gene]    # gene filter
 		tdm_dt = tdm_dt[match(ref_values$gene, gene)] # reorder
-		
+
 		# Convert reference values to be numeric instead of string.
 		ref_num = apply(ref_values[,2:ncol(ref_values),with=F], 2, function(x) as.numeric(x))
 		rownames(ref_num) = ref_values[[1]]
-		
+
 		targ_num = apply(targ_orig[,1:ncol(targ_orig),with=F], 2, function(x) as.numeric(x))
 		rownames(targ_num) = targ_scaled[[1]]
 
 		# Convert target data to be numeric instead of string.
 		tdm_num = apply(tdm_dt[,2:ncol(tdm_dt),with=F], 2, function(x) as.numeric(x))
 		rownames(tdm_num) = tdm_dt[[1]]
-		
+
 		# Create an additional target dataset that is log-transformed, but not TDM normalized.
 		# We can use this as the 'naive' approach.
 		log_dt = log_transform_p1(targ_scaled)
 		setnames(log_dt, colnames(log_dt)[1], "gene")
-		
+
 		# Put genes in the order found in the reference distribution.
 		log_dt = log_dt[match(ref_values$gene, gene)]
-		
+
 		# Make sure that the new target data and reference files are in the same order
 		# and have the same genes.
 		log_dt = log_dt[gene %in% ref_values$gene]
 		log_dt = log_dt[match(ref_values$gene, gene)]
-		
+
 		# Convert the data to numeric.
 		log_num = apply(log_dt[,2:ncol(log_dt),with=F], 2, function(x) as.numeric(x))
 		rownames(log_num) = log_dt[[1]]
-		
+
 		# Create yet another target dataset that is log-transformed, but not TDM normalized.
 		qn_dt = log_transform_p1(targ_scaled)
-		
+
 		# Create a target object for targeted quantile normalization.
 		qn_targ = normalize.quantiles.determine.target(
-				data.matrix(ref_values[,2:ncol(ref_values),with=F]), 
+				data.matrix(ref_values[,2:ncol(ref_values),with=F]),
 				target.length=nrow(ref_values))
-		
+
 		# Quantile normalize the data, against the reference distribution,
-		# using replacement - not averaging. 
+		# using replacement - not averaging.
 		qn_mt = normalize.quantiles.use.target(
 				data.matrix(qn_dt[,2:ncol(qn_dt),with=F]),qn_targ,copy=T)
-		
+
 		# Add the gene names and turn back into a data.table.
 		# It's unecessary to log transform or scale the data
 		# because its distribution is now an exact match for
@@ -212,15 +212,15 @@ run_clustering = function(
 		qn_mt = cbind(qn_dt[[1]], qn_mt)
 		qn_mt = data.table(qn_mt)
 		setnames(qn_mt, colnames(qn_mt), colnames(qn_dt))
-		
+
 		# Put genes in the order found in the reference distribution.
 		qn_mt = qn_mt[match(ref_values$gene, gene)]
-		
+
 		# Make sure that the RNA-seq and reference files are in the same order
 		# and have the same genes.
 		qn_mt = qn_mt[gene %in% ref_values$gene]
 		qn_mt = qn_mt[match(ref_values$gene, gene)]
-				
+
 		# Convert the data to numeric.
 		qn_num = apply(qn_mt[,2:ncol(qn_mt),with=F], 2, function(x) as.numeric(x))
 		rownames(qn_num) = qn_mt[[1]]
@@ -236,12 +236,12 @@ run_clustering = function(
 
 		# Put genes in the order found in the reference distribution.
 		npn_mt = npn_mt[match(ref_values$gene, rownames(npn_mt)),]
-		
+
 		# Make sure that the new target data and reference files are in the same order
 		# and have the same genes.
 		npn_mt = npn_mt[rownames(npn_mt) %in% ref_values$gene,]
 		npn_mt = npn_mt[match(ref_values$gene, rownames(npn_mt)),]
-		
+
 		# Convert the data to numeric.
 		npn_num = apply(npn_mt, 2, function(x) as.numeric(x))
 
@@ -268,7 +268,7 @@ run_clustering = function(
         log_cor[[i+1]] = sapply(1:nrow(log_num), function(x) cor.test(log_num[x,], ref_num[x,], method="kendall"))
         qn_cor[[i+1]] = sapply(1:nrow(qn_num), function(x) cor.test(qn_num[x,], ref_num[x,], method="kendall"))
         npn_cor[[i+1]] = sapply(1:nrow(npn_num), function(x) cor.test(npn_num[x,], npn_ref_num[x,], method="kendall"))
-        
+
         colnames(npn_num) = colnames(log_num)
         rownames(npn_num) = rownames(log_num)
         colnames(npn_ref_num) = colnames(ref_num)
@@ -277,15 +277,15 @@ run_clustering = function(
 		# PAM is like kmeans, but it seems to work a bit better.
 		ref_p = pam(ref_num, k = nconditions)
 		ref_dist = dist(ref_num, method="euclidean")
-		
+
 		npn_ref_p = pam(npn_ref_num, k=nconditions)
-		
+
 		# Get some stats on the clusters.
 		ref_stats[[i+1]] = cluster.stats(ref_dist, as.numeric(ref_p$clustering))
 
 		# Get the distance between all data points.
 		tdm_dist = dist(tdm_num, method="euclidean")
-		
+
 		# Predict clusters for TDM normalized data, given reference clusters and
 		# generate stats for them.
 		tdm_pred = as.numeric(predict(as.kcca(ref_p, ref_num), newdata=tdm_num))
@@ -308,7 +308,7 @@ run_clustering = function(
 		log_cms[[i+1]] = confusionMatrix(log_pred, ref_p$clustering)$overall
 		qn_cms[[i+1]] = confusionMatrix(qn_pred, ref_p$clustering)$overall
 		npn_cms[[i+1]] = confusionMatrix(npn_pred, npn_ref_p$clustering)$overall
-		
+
 		tdm_mds[[i+1]] = plotMDS(t(tdm_num), labels=ref_labels, pch=8, dim.plot=c(1,2), col=c(ref_labels), gene.selection="pairwise", ndim=45)
 		log_mds[[i+1]] = plotMDS(t(log_num), labels=ref_labels, pch=8, dim.plot=c(1,2), col=c(ref_labels), gene.selection="pairwise", ndim=45)
 		qn_mds[[i+1]] = plotMDS(t(qn_num), labels=ref_labels, pch=8, dim.plot=c(1,2), col=c(ref_labels), gene.selection="pairwise", ndim=45)
@@ -318,7 +318,7 @@ run_clustering = function(
 
 		message("Step: ", i, appendLF=TRUE)
 	}
-	
+
 	return(list(last_ref=ref_num, last_tdm=tdm_num, last_log=log_num, last_qn=qn_num, last_npn=npn_num, labels=labels, ref_stats=ref_stats, tdm_stats=tdm_stats, log_stats=log_stats, qn_stats=qn_stats, npn_stats=npn_stats, tdm_cor=tdm_cor, log_cor=log_cor, qn_cor=qn_cor, npn_cor=npn_cor, tdm_cms=tdm_cms, log_cms=log_cms, qn_cms=qn_cms, npn_cms=npn_cms, tdm_mds=tdm_mds, log_mds=log_mds, qn_mds=qn_mds, npn_mds=npn_mds))
 }
 
@@ -330,9 +330,9 @@ get_cluster_stats = function(dist, pred) {
 	}
 } # end get_cluster_stats
 
-# This function (from package_loader.R) will check all of the listed packages 
-# (they don't all need to be done before the rest of the program) to see 
-# if they are loaded. If not, it will load them if they are available, 
+# This function (from package_loader.R) will check all of the listed packages
+# (they don't all need to be done before the rest of the program) to see
+# if they are loaded. If not, it will load them if they are available,
 # else it will install them and then load them.
 load_it(c("ggplot2",
 		"reshape2",
@@ -353,7 +353,8 @@ load_it(c("ggplot2",
 		"gridExtra",
 		"huge",
 		"caret",
-		"limma"))
+		"limma",
+		"cowplot"))
 
 # This one is on github, so we will handle it separately.
 if(!require("quantroSim", quietly=T)){
@@ -377,11 +378,11 @@ ZERO_DATA = FALSE # Should we zero out some genes?
 
 # Run the tests.
 test_results = run_clustering(
-		num_trials=NUM_TRIALS, 
-		num_methods=NUM_METHODS, 
-		noise_loop=NOISE_LOOP, 
-		noise=NOISE, 
-		zero_data=ZERO_DATA, 
+		num_trials=NUM_TRIALS,
+		num_methods=NUM_METHODS,
+		noise_loop=NOISE_LOOP,
+		noise=NOISE,
+		zero_data=ZERO_DATA,
 		noise_step=.2,
 		ref_file=ref_file,
 		target_file=target_file)
@@ -437,17 +438,17 @@ results$Noise = (results$Noise - 1) * .2
 
 results$Method = factor(results$Method, levels=c("TDM", "QN", "LOG", "NPN"))
 # Show the results.
-cbbPalette <- c("#000000", "#009E73", "#e79f00", "#9ad0f3", "#0072B2", "#D55E00", 
+cbbPalette <- c("#000000", "#009E73", "#e79f00", "#9ad0f3", "#0072B2", "#D55E00",
                     "#CC79A7", "#F0E442")
 ggplot(data=results, aes(x=Noise, y=Accuracy, group=Method, color=Method, shape=Method)) +
 		geom_line() +
-		geom_point() + ylab("Proportion correctly classified") + 
+		geom_point() + ylab("Proportion correctly classified") +
 		xlab("Percent noise added") +
 		#geom_rect(aes(xmin=1.9, xmax=2.1, ymin=.74, ymax=.76),color="red") +
 		#geom_rect(aes(xmin=13.9, xmax=14.1, ymin=.27, ymax=.29),color="red") +
 		#geom_rect(aes(xmin=6.9, xmax=7.1, ymin=.32, ymax=.34),color="red") +
 		theme_bw() +
-		theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+		theme(axis.text.x = element_text(angle = 90, hjust = 1),
 				axis.title.y = element_text(size=10),
 				axis.title.x = element_text(size=10)) +
 		expand_limits(x = 0, y = 0) +
@@ -469,24 +470,24 @@ mds_npn = cbind(mds_npn, labels = as.factor(test_results$labels[[10]]))
 
 mds_all = rbind(mds_tdm, mds_log, mds_qn, mds_npn)
 
-cbbPalette <- c("#000000", "#009E73", "#e79f00", "#9ad0f3", "#0072B2", "#D55E00", 
+cbbPalette <- c("#000000", "#009E73", "#e79f00", "#9ad0f3", "#0072B2", "#D55E00",
                     "#CC79A7", "#F0E442")
 
-ggplot() + 
-		geom_point(data=mds_all,aes(x=MDS1,y=MDS2,shape=labels,colour=labels),size=2) + 
-		theme_bw() + 
-		theme(axis.text.x = element_text(size=5),  
-				axis.text.y = element_text(size=5), 
-				axis.title.x = element_text(size=10), 
-				axis.title.y = element_text(size=10), 
-				panel.background = element_blank(), 
-				panel.grid.major = element_blank(),  
-				panel.grid.minor = element_blank(),  
+ggplot() +
+		geom_point(data=mds_all,aes(x=MDS1,y=MDS2,shape=labels,colour=labels),size=2) +
+		theme_bw() +
+		theme(axis.text.x = element_text(size=5),
+				axis.text.y = element_text(size=5),
+				axis.title.x = element_text(size=10),
+				axis.title.y = element_text(size=10),
+				panel.background = element_blank(),
+				panel.grid.major = element_blank(),
+				panel.grid.minor = element_blank(),
 				plot.background = element_blank(),
 				plot.title = element_text(size=12)) +
 		labs(x="Coordinate 1", y="Coordinate 2") +
-		theme(legend.direction = "horizontal", 
-				legend.position = "bottom", 
+		theme(legend.direction = "horizontal",
+				legend.position = "bottom",
 				legend.box="vertical") +
 		scale_color_manual(values=cbbPalette) +
 		facet_wrap(~Method, ncol=4)
@@ -502,15 +503,15 @@ correlation = rbind(tdm_correlation, log_correlation, qn_correlation, npn_correl
 
 correlation$Noise = (correlation$Noise - 1) * .2
 
-cbbPalette <- c("#000000", "#009E73", "#e79f00", "#9ad0f3", "#0072B2", "#D55E00", 
+cbbPalette <- c("#000000", "#009E73", "#e79f00", "#9ad0f3", "#0072B2", "#D55E00",
                     "#CC79A7", "#F0E442")
-ggplot(data=correlation, aes(x=Noise, y=Tau, color=Dataset, group=Dataset, shape=Dataset)) + 
+ggplot(data=correlation, aes(x=Noise, y=Tau, color=Dataset, group=Dataset, shape=Dataset)) +
 	geom_line() +
 	geom_point() +
 	ylab("Kendall's Tau") +
 	xlab("Noise") +
 	theme_bw() +
-	theme(axis.text.x = element_text(angle = 90, hjust = 1), 
+	theme(axis.text.x = element_text(angle = 90, hjust = 1),
 			axis.title.y = element_text(size=10),
 			axis.title.x = element_text(size=10)) +
 	expand_limits(x = 0, y = 0) +
@@ -521,23 +522,23 @@ ggsave(paste0(output, "correlations.pdf"), plot=last_plot(), width=6, height=3)
 quantro(t(test_results$last_log), test_results$labels[[20]], B=100)
 
 plot_mds = function(data) {
-	the_plot = ggplot() + 
-		geom_point(data=data,aes(x=MDS1,y=MDS2,shape=labels,colour=labels),size=2) + 
-		theme_bw() + 
-		theme(axis.text.x = element_text(size=8, angle = 90, hjust = 1),  
-				axis.text.y = element_text(size=8, angle = 90, hjust = 1), 
-				axis.title.x = element_text(size=10), 
-				axis.title.y = element_text(size=10), 
-				panel.background = element_blank(), 
-				panel.grid.major = element_blank(),  
-				panel.grid.minor = element_blank(),  
+	the_plot = ggplot() +
+		geom_point(data=data,aes(x=MDS1,y=MDS2,shape=labels,colour=labels),size=2) +
+		theme_bw() +
+		theme(axis.text.x = element_text(size=8, angle = 90, hjust = 1),
+				axis.text.y = element_text(size=8, angle = 90, hjust = 1),
+				axis.title.x = element_text(size=10),
+				axis.title.y = element_text(size=10),
+				panel.background = element_blank(),
+				panel.grid.major = element_blank(),
+				panel.grid.minor = element_blank(),
 				plot.background = element_blank(),
 				plot.title = element_text(size=12)) +
 		labs(x="Coordinate 1", y="Coordinate 2") +
-		theme(legend.direction = "horizontal", 
-				legend.position = "bottom", 
+		theme(legend.direction = "horizontal",
+				legend.position = "bottom",
 				legend.box="vertical") +
-		scale_color_manual(values=cbbPalette) 
+		scale_color_manual(values=cbbPalette)
 		return(the_plot)
 }
 

@@ -39,6 +39,7 @@ This requires the following R & Bioconductor packages be installed:
     * stringr
     * gdata
     * binr
+    * cowplot
 
 One github package is required:
 
