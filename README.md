@@ -13,6 +13,39 @@ have it installed. Once you install the client, run `git lfs pull` in the
 clone to retrieve the datasets. After retrieving the datasets, using
 run_experiments.R will regenerate the results.
 
+This requires the following R & Bioconductor packages be installed:
+    * ggplot2
+		* reshape2
+		* Hmisc
+		* data.table
+		* scales
+		* sdcMicro
+		* flexclust
+		* fpc
+		* corrplot
+		* ape
+		* cluster
+		* plyr
+		* dplyr
+		* devtools
+		* quantro
+		* preprocessCore
+		* gridExtra
+		* huge
+		* caret
+		* limma
+    * glmnet
+    * e1071
+    * stringr
+    * gdata
+    * binr
+
+One github package is required:
+
+    library("devtools")
+    install_github(repo = "quantroSim", username = "stephaniehicks")
+
+
 Acknowledgements:
 This research is funded in part by the Gordon and Betty Moore Foundation’s
 Data-Driven Discovery Initiative through Grant GBMF4552 to CSG. JT is a Neukom
