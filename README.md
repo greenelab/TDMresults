@@ -46,6 +46,9 @@ One github package is required:
     library("devtools")
     install_github(repo = "quantroSim", username = "stephaniehicks")
 
+By default, all input data is expected to be in this local directory and
+normalized data and figure output is within this directory as well. If you'd
+like to change this behavior, modify "directories.R".
 
 Acknowledgements:
 This research is funded in part by the Gordon and Betty Moore Foundation’s
