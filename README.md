@@ -13,7 +13,8 @@ have it installed. Once you install the client, run `git lfs pull` in the
 clone to retrieve the datasets. After retrieving the datasets, using
 run_experiments.R will regenerate the results.
 
-This requires the following R & Bioconductor packages be installed:
+This requires the following R & Bioconductor packages be installed (see 
+check_installs.R for confirmation of installation):
 
 	* ggplot2
 	* reshape2
@@ -46,6 +47,9 @@ One github package is required:
 
     library("devtools")
     install_github(repo = "quantroSim", username = "stephaniehicks")
+
+We have created an R script which will call 'require' on each of these packages
+to make sure they are installed: check_installs.R
 
 By default, all input data is expected to be in this local directory and
 normalized data and figure output is within this directory as well. If you'd
